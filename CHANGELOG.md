@@ -24,6 +24,11 @@ Add entries under `[Unreleased]` in the same commit as the code change.
 
 ### Added
 
+- **README: "Working with a reasoning model (gpt-5-mini)" section** — the two hard 400s (`max_tokens`,
+  `temperature`) with Azure's verbatim error text, and a measured table of completion budgets against
+  outcomes, so the empty-response failure mode is recognisable before it costs anyone an afternoon.
+- **README: Stack and Contributing sections** — states plainly that the project is plain JavaScript with
+  no TypeScript (the `.jsx` extension invites the opposite assumption), and records the release-notes-per-commit convention.
 - **`CLAUDE.md`** — orientation for an agent opening this repo cold: stack, run instructions, the Azure
   constraints above, configuration reference, and deliberate gaps.
 - **`CHANGELOG.md`** — this file.
@@ -33,6 +38,17 @@ Add entries under `[Unreleased]` in the same commit as the code change.
   `finish_reason` so a stream with no content deltas explains the real cause.
 - **Production build documented** in the README, including that `npm run preview` does not inherit the
   `/api` proxy from `vite.config.js`'s `server` block.
+
+### Documentation
+
+- **All docs updated to describe Azure AI Foundry rather than classic Azure OpenAI**, matching the code as
+  shipped: the title, architecture diagram, prerequisites, and project layout now name the v1 surface.
+- **Environment variable table rewritten** with a Required column. `AZURE_OPENAI_API_VERSION` is now marked
+  **unused** (it previously read as mandatory, which was actively misleading), `AZURE_OPENAI_MAX_TOKENS` is
+  documented, and the endpoint row explains that a portal-supplied `/openai/v1` suffix is accepted.
+- **`backend/.env.example` rewritten** to match — Foundry endpoint, a note that plain key auth suffices
+  instead of `DefaultAzureCredential`, the budget variable with its reasoning-token caveat, and
+  `AZURE_OPENAI_API_VERSION` commented out as unused.
 
 ### Changed
 
