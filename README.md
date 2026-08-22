@@ -153,12 +153,12 @@ only thing that will actually fail on a type error.
 
 ```bash
 cd frontend
-npm run typecheck    # tsc --noEmit
-npm run build        # runs tsc --noEmit first, then vite build
+npm run check        # umbrella verification; today this is tsc --noEmit
+npm run build        # runs check first, then vite build
 ```
 
-`npm run dev` does **not** typecheck — Vite's transform ignores types entirely, so a broken type still hot-reloads
-happily. Run `typecheck` before committing.
+`npm run dev` does **not** typecheck — Vite's transform ignores types entirely, so a broken type still
+hot-reloads happily. `npm run check` is the gate, and `githooks/pre-commit` runs it for you.
 
 `tsconfig.json` enables `strict` plus `noUnusedLocals`, `noUnusedParameters`, `noFallthroughCasesInSwitch`,
 and `noUncheckedIndexedAccess`. That last one is why `buffer.split()` results are accessed defensively in
@@ -174,12 +174,39 @@ no lint config yet.
 
 ## Contributing
 
-- **Every commit ships release notes.** Add an entry to `CHANGELOG.md` under `[Unreleased]` in the same
-  commit as the change — not as a follow-up. For non-obvious fixes, record the evidence (the exact API
-  error, the measured numbers), because that is what a future reader cannot reconstruct from the diff.
-- `CLAUDE.md` holds the orientation an agent or new developer needs on a cold start. Keep it current when
-  the Azure contract, the run instructions, or the stack changes.
-- Never commit `backend/.env`, keys, or `node_modules`.
+**Every commit ships its documentation.** Code, release notes, and docs land in the same commit — never as
+a follow-up. Before committing:
+
+| # | Step | Enforced? |
+| --- | --- | --- |
+| 1 | Add a `CHANGELOG.md` entry under `[Unreleased]`. For non-obvious fixes record the *evidence* — the verbatim API error, the measured numbers — since that is what a diff cannot convey | **blocks the commit** |
+| 2 | Update `README.md` if setup, commands, configuration, or the stack changed | reminder |
+| 3 | Update `CLAUDE.md` if the stack, Azure contract, run instructions, or conventions changed | reminder |
+| 4 | `cd frontend && npm run check` | **blocks the commit** |
+| 5 | Never commit `backend/.env`, keys, `node_modules`, or build output | `.gitignore` |
+
+Steps 1 and 4 are enforced by `githooks/pre-commit`. Steps 2 and 3 only warn — no hook can judge whether
+prose is still true, so that judgement stays with you.
+
+**After a fresh clone, enable the hook** (Git does not do this automatically):
+
+```bash
+git config core.hooksPath githooks
+```
+
+The hook sources nvm and honours `.nvmrc`, because hooks run with a bare environment in which `node` may
+resolve to an old version. Bypass a single commit with `git commit --no-verify`.
+
+### Frontend scripts
+
+```bash
+npm run check      # umbrella verification — types today; add lint and tests here
+npm run typecheck  # tsc --noEmit specifically
+npm run build      # runs check first, then vite build
+npm run dev        # NO typechecking
+```
+
+`check` is the entry point to call and to extend. `build` is gated on it, so a type error fails the build.
 
 ## Notes and known gaps
 

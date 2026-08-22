@@ -94,13 +94,44 @@ Streaming is parsed by hand in `App.jsx`: SSE frames split on a blank line, buff
 boundaries. Errors always render as an inline error bubble — never an alert, never a blank screen — and
 the rest of the conversation survives.
 
-## Conventions
+## Commit process
 
-- **Release notes are required for every commit.** Add an entry to `CHANGELOG.md` under `[Unreleased]`
-  in the same commit as the code change. Keep a Changelog format; describe user-visible effect and the
-  evidence for non-obvious fixes.
-- Commits go to `main`; remote is `origin` (HTTPS, authenticated via macOS keychain).
-- Never commit `.env`, keys, or `node_modules`.
+**Every commit ships its documentation.** Code, docs, and release notes land together — never as a
+follow-up, because a commit that changes behaviour without changing its docs is how the docs went stale
+before. Work through this checklist before committing:
+
+1. **`CHANGELOG.md`** — add an entry under `[Unreleased]`, Keep a Changelog format. Describe the
+   user-visible effect, and for non-obvious fixes record the *evidence* (the verbatim API error, the
+   measured numbers). That is what a future reader cannot reconstruct from the diff.
+2. **`README.md`** — update if setup, commands, configuration, or the stack changed.
+3. **`CLAUDE.md`** — update if anything here is now wrong: the stack, the Azure contract, run
+   instructions, conventions, or the known-gaps list.
+4. **`npm run check`** in `frontend/` — must pass. Vite does not typecheck, so this is the only gate.
+5. **Never commit** `backend/.env`, keys, `node_modules`, or build output.
+
+Steps 1 and 4 are enforced by `githooks/pre-commit`; steps 2 and 3 get a reminder, since no hook can
+judge whether a doc is still accurate. The hook is versioned in the repo — after a fresh clone, enable it:
+
+```bash
+git config core.hooksPath githooks
+```
+
+It sources nvm and honours `.nvmrc`, because hooks run with a bare environment where `node` may resolve to
+this machine's Node 10 and fail with a confusing `SyntaxError: Unexpected token ?`. Bypass a single commit
+with `git commit --no-verify` when you genuinely need to.
+
+Commits go to `main`; remote is `origin` (HTTPS, authenticated via macOS keychain).
+
+## Frontend scripts
+
+```bash
+npm run check      # umbrella verification — types today, add lint/tests here
+npm run typecheck  # tsc --noEmit specifically
+npm run build      # runs check first, then vite build
+npm run dev        # NO typechecking — Vite strips types without checking them
+```
+
+`check` is the entry point to call and to extend; keep `build` gated on it.
 
 ## Known gaps (deliberate)
 

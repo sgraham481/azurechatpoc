@@ -5,6 +5,21 @@ Add entries under `[Unreleased]` in the same commit as the code change.
 
 ## [Unreleased]
 
+### Added
+
+- **`githooks/pre-commit` — the commit checklist is now enforced, not just documented.** It blocks a commit
+  when source files changed without a `CHANGELOG.md` entry, and when `frontend/` fails `npm run check`.
+  It also warns (without blocking) when source changed but `README.md`/`CLAUDE.md` did not, since no hook
+  can judge whether prose is still accurate.
+  - The hook sources nvm and honours `.nvmrc`. Git hooks run with a bare environment where `node` can
+    resolve to this machine's Node 10, which cannot parse modern `tsc` and fails with a misleading
+    `SyntaxError: Unexpected token ?`. Found while testing the hook, not in production.
+  - Versioned in the repo rather than left in `.git/hooks`, so it survives a clone. Enable with
+    `git config core.hooksPath githooks`. Bypass one commit with `git commit --no-verify`.
+- **`npm run check`** in `frontend/` — the umbrella verification entry point, currently `tsc --noEmit`.
+  Lint and tests should be added behind this name rather than as new scripts. `npm run typecheck` remains
+  for types specifically, and **`npm run build` now runs `check` first**, so a type error fails the build.
+
 ### Changed
 
 - **The frontend is now TypeScript.** All 10 `.jsx` files became `.tsx` (renamed via `git mv`, so history

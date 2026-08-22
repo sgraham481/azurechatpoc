@@ -5,9 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
-    "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "check": "npm run typecheck",
+    "typecheck": "tsc --noEmit",
+    "build": "npm run check && vite build",
+    "preview": "vite preview"
   },
   "dependencies": {
     "react": "^18.3.1",

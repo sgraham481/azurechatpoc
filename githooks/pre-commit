@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+# Enforces the commit checklist in CLAUDE.md.
+#   1. Source changes ship with a CHANGELOG.md entry.
+#   2. Frontend changes typecheck.
+# Bypass a single commit with --no-verify when you genuinely need to.
+set -u
+
+# Git hooks get a minimal environment that never sources the shell profile, so
+# `node` here can be whatever is first on a bare PATH — on this machine that is
+# Node 10, which cannot parse modern tsc and fails with "Unexpected token ?".
+# Load nvm and honour .nvmrc so the hook runs the same Node the project pins.
+if [ -s "${NVM_DIR:-$HOME/.nvm}/nvm.sh" ]; then
+  export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+  # shellcheck disable=SC1091
+  . "$NVM_DIR/nvm.sh" >/dev/null 2>&1
+  nvm use >/dev/null 2>&1 || nvm use default >/dev/null 2>&1
+fi
+
+staged=$(git diff --cached --name-only --diff-filter=ACMR)
+[ -z "$staged" ] && exit 0
+
+fail=0
+say() { printf '\n  %s\n' "$1"; }
+
+# --- 1. Release notes -------------------------------------------------------
+src_changed=$(printf '%s\n' "$staged" | grep -E '^(backend|frontend)/.*\.(js|jsx|ts|tsx|css|html)$' || true)
+notes_changed=$(printf '%s\n' "$staged" | grep -E '^CHANGELOG\.md$' || true)
+
+if [ -n "$src_changed" ] && [ -z "$notes_changed" ]; then
+  say "BLOCKED: source changed but CHANGELOG.md did not."
+  printf '  Every commit ships release notes. Add an entry under [Unreleased].\n'
+  printf '  Changed source:\n'
+  printf '%s\n' "$src_changed" | sed 's/^/    /'
+  fail=1
+fi
+
+# --- 2. Frontend typecheck --------------------------------------------------
+fe_changed=$(printf '%s\n' "$staged" | grep -E '^frontend/.*\.(ts|tsx)$|^frontend/tsconfig\.json$' || true)
+if [ -n "$fe_changed" ]; then
+  if [ -d frontend/node_modules ]; then
+    if ! (cd frontend && npm run --silent check >/tmp/precommit-check.$$ 2>&1); then
+      say "BLOCKED: frontend/ does not typecheck.  (node $(node -v 2>/dev/null || echo '?'))"
+      sed 's/^/    /' /tmp/precommit-check.$$ | head -25
+      printf '\n  Vite does not typecheck, so `npm run dev` will not catch this.\n'
+      fail=1
+    fi
+    rm -f /tmp/precommit-check.$$
+  else
+    say "SKIPPED typecheck: frontend/node_modules missing (run npm install)."
+  fi
+fi
+
+# --- Reminders the hook cannot verify ---------------------------------------
+if [ "$fail" -eq 0 ] && [ -n "$src_changed" ]; then
+  docs_changed=$(printf '%s\n' "$staged" | grep -E '^(README|CLAUDE)\.md$' || true)
+  if [ -z "$docs_changed" ]; then
+    say "Reminder: README.md and CLAUDE.md are unchanged."
+    printf '  Fine if this commit did not alter behaviour, setup, or the stack — but check.\n'
+  fi
+fi
+
+[ "$fail" -ne 0 ] && printf '\n  Bypass with: git commit --no-verify\n\n'
+exit "$fail"
