@@ -65,6 +65,28 @@ zero visible text; a routine question used 512 reasoning tokens. A blank assista
 this, not a streaming bug — raise `AZURE_OPENAI_MAX_TOKENS`. Both paths guard against it: the non-streaming
 path returns a `budget_exhausted` error, and `App.jsx` names the cause when a stream yields no deltas.
 
+## Deployment
+
+Deploys to **Azure Static Web Apps** — static React bundle plus a managed Function at `/api/*` on the same
+origin. **GitHub Pages cannot host this app**: it serves static files only and cannot run the API. Pages is
+enabled on the repo and renders `README.md` via Jekyll; that is unrelated to the deployment.
+
+- `api/src/chat-core.mjs` is the **single source of truth for the Azure contract**, shared by the deployed
+  Function (`api/src/functions/chat.mjs`) and the local Express route (`backend/src/routes/chat.js`).
+  Change the Azure call here, never in one of the adapters.
+- **The deployed Function does not stream.** HTTP streaming through Static Web Apps' managed functions is
+  unreliable, so it returns one JSON completion. `App.tsx` picks its path from the response `Content-Type`,
+  so the same build works locally (SSE) and deployed (JSON) with no configuration. Do not "fix" the
+  deployed app by forcing the streaming path.
+- `staticwebapp.config.json` gates `/*` and `POST /api/chat` behind the custom role **`chatuser`**, granted
+  only by invitation via the portal's Role management. This is deliberate: the built-in `authenticated`
+  role would admit any Microsoft or GitHub account, i.e. anyone, spending real tokens. `/api/health` is
+  intentionally anonymous so deploys can be smoke-tested.
+- Runtime config lives in the Static Web App's *Application settings*, using the same variable names as
+  `backend/.env`.
+- `.github/workflows/azure-static-web-apps.yml` runs `npm run check` before deploying, so a type error
+  fails the deploy rather than shipping.
+
 ## Configuration
 
 `backend/.env` (gitignored — never commit it, never print the key):
@@ -80,9 +102,15 @@ path returns a `budget_exhausted` error, and `App.jsx` names the cause when a st
 ## Layout
 
 ```
-backend/src/server.js        Express app, CORS, /api/health, config validation
-backend/src/routes/chat.js   POST /api/chat — system prompt, Azure v1 call, SSE passthrough, error mapping
-frontend/src/types.ts        Message, WireMessage, StreamChunk, FinishReason, ApiError
+backend/src/server.js        Express app, CORS, /api/health, config validation (local dev only)
+backend/src/routes/chat.js   Local Express adapter over chat-core — adds the SSE streaming path
+api/src/chat-core.mjs        THE Azure contract — shared by the Function and the Express route
+api/src/functions/chat.mjs   Deployed POST /api/chat (JSON, no streaming)
+api/src/functions/health.mjs Deployed GET /api/health
+staticwebapp.config.json     Routes, roles, auth redirects for Static Web Apps
+frontend/public/login.html   Sign-in chooser (Microsoft / GitHub)
+frontend/public/denied.html  Signed in but not invited
+frontend/src/types.ts        Message, WireMessage, StreamChunk, ChatCompletion, FinishReason, ApiError
 frontend/src/App.tsx         Message state, send handler, hand-rolled SSE parsing
 frontend/src/components/     Header/Sidebar/Footer (presentational), ChatWindow, MessageBubble,
                              ChatInput, SuggestionChips, Icons (inline SVG) — all .tsx

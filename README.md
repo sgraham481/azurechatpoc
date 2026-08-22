@@ -77,6 +77,81 @@ npm run preview   # serves dist/ on http://localhost:4173
 
 **Non-streaming fallback:** `POST /api/chat?stream=false` returns a single JSON completion instead. Useful if streaming misbehaves during a live demo.
 
+## Deploying (Azure Static Web Apps)
+
+The app deploys to Azure Static Web Apps: the built React bundle is served statically, and
+`api/` runs as a managed Azure Function at `/api/*` on the same origin. The Azure key stays server-side,
+exactly as it does locally — **it is never in the bundle**.
+
+**GitHub Pages cannot host this.** Pages serves static files only and cannot run the API, so the browser
+would have nowhere to send `/api/chat`. Pages is currently enabled on this repo and renders `README.md` via
+Jekyll at `sgraham481.github.io/azurechatpoc/` — that is documentation, not the app, and is unrelated to the
+deployment below.
+
+### Architecture as deployed
+
+```
+Browser ──▶ Azure Static Web Apps
+              ├── /            dist/ (static React build)
+              └── /api/chat    managed Function ──HTTPS──▶ Azure AI Foundry
+```
+
+`api/src/chat-core.mjs` holds the Azure contract and is shared by the deployed Function *and* the local
+Express server, so the two cannot drift apart. `backend/` is now only a local-development adapter.
+
+### Streaming, and why the deployed app does not use it
+
+Locally the Express route streams SSE and tokens appear as they arrive. **The deployed Function returns a
+single JSON completion instead**, because HTTP streaming through Static Web Apps' managed functions is not
+dependable. The frontend picks its path from the response `Content-Type`, so one build works in both places
+with no configuration — but expect the deployed app to show the typing indicator and then the whole answer
+at once, rather than word by word. With a reasoning model most of the wait happens before the first token
+anyway, so the difference is smaller than it sounds.
+
+### One-time setup
+
+Steps 1–4 must be done by someone with access to the Azure subscription; they cannot be scripted from here.
+
+1. **Create the Static Web App.** Azure portal → Create resource → Static Web App. Plan: **Free**.
+   Deployment source: **GitHub**, this repo, branch `main`. When it asks for build details, choose
+   *Custom* and enter app location `frontend`, api location `api`, output location `dist`.
+   Azure adds a deployment workflow of its own — **delete it**, since
+   `.github/workflows/azure-static-web-apps.yml` in this repo already does the job and additionally runs
+   `npm run check` before deploying.
+2. **Add the deployment token to GitHub.** Portal → your Static Web App → *Manage deployment token*, copy it.
+   GitHub → repo → Settings → Secrets and variables → Actions → new secret named
+   `AZURE_STATIC_WEB_APPS_API_TOKEN`.
+3. **Add the Azure credentials as application settings.** Portal → your Static Web App → *Environment
+   variables* (Application settings). These are the same names as `backend/.env` and are what the Function
+   reads at runtime:
+
+   | Setting | Value |
+   | --- | --- |
+   | `AZURE_OPENAI_ENDPOINT` | your Foundry endpoint |
+   | `AZURE_OPENAI_API_KEY` | KEY 1 or KEY 2 |
+   | `AZURE_OPENAI_DEPLOYMENT` | `gpt-5-mini` |
+   | `AZURE_OPENAI_MAX_TOKENS` | `2000` (optional) |
+
+4. **Invite the people who may use it** — see below.
+5. **Push to `main`.** The workflow typechecks, builds, and deploys.
+
+### Access control
+
+`staticwebapp.config.json` gates `/*` and `POST /api/chat` behind a **custom role named `chatuser`**.
+
+This distinction matters: the built-in `authenticated` role would admit **anyone with a Microsoft or GitHub
+account** — the entire internet, spending your Azure tokens. `chatuser` is granted only by invitation.
+
+To invite someone: portal → your Static Web App → **Role management** → *Invite*, choose their provider,
+enter their username/email, and set the role to exactly `chatuser`. Send them the generated link.
+
+- Signing in is not sufficient; an uninvited account lands on `denied.html` explaining that.
+- `/api/health` stays anonymous so a deploy can be smoke-tested without logging in.
+- `/logout` clears the session.
+
+Even so, treat the endpoint as spend: invited users are trusted users. Set a budget alert on the Azure
+resource if that matters.
+
 ## Working with a reasoning model (gpt-5-mini)
 
 gpt-5 models are **reasoning** models, and three of their rules broke the original request shape. Each was

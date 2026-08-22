@@ -37,3 +37,16 @@ export interface ApiError {
   error?: string;
   message?: string;
 }
+
+/** A single non-streaming completion, as returned by the deployed Azure Function.
+ *  Static Web Apps' managed functions do not stream reliably, so the same
+ *  frontend handles both shapes and picks by Content-Type. */
+export interface ChatCompletion {
+  choices?: Array<{
+    message?: { content?: string | null };
+    finish_reason?: FinishReason | null;
+  }>;
+  /** Set on 200 responses that carry a handled failure (budget_exhausted, content_filter). */
+  error?: string;
+  message?: string;
+}

@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json.schemastore.org/staticwebapp.config.json",
+
+  "routes": [
+    { "route": "/.auth/*", "allowedRoles": ["anonymous"] },
+    { "route": "/login.html", "allowedRoles": ["anonymous"] },
+    { "route": "/denied.html", "allowedRoles": ["anonymous"] },
+    { "route": "/logout", "redirect": "/.auth/logout", "allowedRoles": ["anonymous"] },
+
+    { "route": "/api/health", "allowedRoles": ["anonymous"] },
+    { "route": "/api/chat", "methods": ["POST"], "allowedRoles": ["chatuser"] },
+
+    { "route": "/*", "allowedRoles": ["chatuser"] }
+  ],
+
+  "responseOverrides": {
+    "401": { "statusCode": 302, "redirect": "/login.html" },
+    "403": { "statusCode": 302, "redirect": "/denied.html" }
+  },
+
+  "navigationFallback": {
+    "rewrite": "/index.html",
+    "exclude": ["/assets/*", "/*.{png,jpg,gif,svg,ico}", "/login.html", "/denied.html"]
+  },
+
+  "globalHeaders": {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "strict-origin-when-cross-origin"
+  },
+
+  "platform": { "apiRuntime": "node:20" }
+}

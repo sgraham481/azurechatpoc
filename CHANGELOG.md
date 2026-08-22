@@ -7,6 +7,37 @@ Add entries under `[Unreleased]` in the same commit as the code change.
 
 ### Added
 
+- **Deployment to Azure Static Web Apps**, so the app can be shared in a browser with the Azure key still
+  server-side. GitHub Pages was evaluated and cannot host this: it serves static files only and cannot run
+  the API, so `/api/chat` would 404 on every message. Pages remains enabled on the repo and renders
+  `README.md` via Jekyll, which is unrelated.
+  - `api/` — an Azure Functions app (`@azure/functions` v4) exposing `POST /api/chat` and `GET /api/health`.
+  - `staticwebapp.config.json` — routes, auth redirects, and role gating.
+  - `.github/workflows/azure-static-web-apps.yml` — runs `npm run check` **before** deploying, so a type
+    error fails the deploy instead of shipping. Node version comes from `.nvmrc` so CI cannot drift.
+  - `frontend/public/login.html` and `denied.html` — a provider chooser and a clear "signed in but not
+    invited" page, rather than a bare 401/403.
+- **Access is gated behind a custom `chatuser` role**, granted only by invitation through the portal's Role
+  management. Deliberately *not* the built-in `authenticated` role, which admits any Microsoft or GitHub
+  account — i.e. anyone on the internet, spending real Azure tokens. `/api/health` stays anonymous so
+  deploys can be smoke-tested without a login.
+
+### Changed
+
+- **The Azure contract moved to `api/src/chat-core.mjs`, shared by both entry points.** The deployed
+  Function and the local Express route are now thin adapters over it. The gpt-5 parameter rules were
+  discovered by probing the live deployment and are easy to get wrong; two copies would have drifted.
+  `backend/` is now a local-development adapter only.
+- **The frontend picks streaming vs. JSON from the response `Content-Type`.** HTTP streaming through
+  Static Web Apps' managed functions is not dependable, so the deployed Function returns a single JSON
+  completion while local Express still streams SSE. One build works in both places with no configuration.
+  Visible effect when deployed: the typing indicator, then the whole answer at once, rather than word by
+  word.
+- **The pre-commit doc reminder now also triggers** on `staticwebapp.config.json`, `.github/workflows/*`,
+  and `api/src/*`, matching the new deployment surface the docs describe.
+
+### Added
+
 - **`githooks/pre-commit` — the commit checklist is now enforced, not just documented.** It blocks a commit
   when source files changed without a `CHANGELOG.md` entry, and when `frontend/` fails `npm run check`.
   It also warns (without blocking) when source changed but `README.md`/`CLAUDE.md` did not, since no hook

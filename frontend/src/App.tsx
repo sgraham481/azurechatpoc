@@ -6,7 +6,7 @@ import ChatWindow from './components/ChatWindow.tsx';
 import ChatInput from './components/ChatInput.tsx';
 import SuggestionChips from './components/SuggestionChips.tsx';
 import { SparkIcon } from './components/Icons.tsx';
-import type { ApiError, FinishReason, Message, StreamChunk, WireMessage } from './types.ts';
+import type { ApiError, ChatCompletion, FinishReason, Message, StreamChunk, WireMessage } from './types.ts';
 
 const SUGGESTIONS = [
   'Where do we stand?',
@@ -66,7 +66,31 @@ export default function App() {
         const problem: ApiError = await res.json().catch(() => ({}) as ApiError);
         throw new Error(problem.message || `Request failed with status ${res.status}.`);
       }
-      if (!res.body) throw new Error('Response had no body to stream.');
+      if (!res.body) throw new Error('Response had no body to read.');
+
+      // Local Express streams SSE; the deployed Azure Function returns one JSON
+      // completion, because Static Web Apps' managed functions do not stream
+      // reliably. Pick the path from the response itself so the same build works
+      // in both places with no configuration.
+      if (!res.headers.get('content-type')?.includes('text/event-stream')) {
+        const data = (await res.json()) as ChatCompletion;
+        if (data.error) throw new Error(data.message || 'The request failed.');
+
+        const choice = data.choices?.[0];
+        const content = choice?.message?.content ?? '';
+        if (!content.trim()) {
+          throw new Error(
+            choice?.finish_reason === 'length'
+              ? 'The model spent its whole token budget on reasoning before writing an answer. Raise AZURE_OPENAI_MAX_TOKENS.'
+              : 'Azure returned an empty response. Try again.'
+          );
+        }
+
+        setWaitingFirstToken(false);
+        setMessages((prev) => [...prev, { id: assistantId, role: 'assistant', content }]);
+        setLastResponseMs(Math.round(performance.now() - startedAt));
+        return;
+      }
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();

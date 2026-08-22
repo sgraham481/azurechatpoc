@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import chatRouter from './routes/chat.js';
+import { missingConfig } from '../../api/src/chat-core.mjs';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -19,14 +20,6 @@ app.use('/api/chat', chatRouter);
 app.use('/api', (req, res) => {
   res.status(404).json({ error: 'not_found', message: `No route for ${req.method} ${req.originalUrl}` });
 });
-
-function missingConfig() {
-  return [
-    'AZURE_OPENAI_ENDPOINT',
-    'AZURE_OPENAI_API_KEY',
-    'AZURE_OPENAI_DEPLOYMENT',
-  ].filter((key) => !process.env[key]);
-}
 
 app.listen(PORT, () => {
   const missing = missingConfig();

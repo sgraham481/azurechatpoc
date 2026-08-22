@@ -60,9 +60,9 @@ if [ "$fail" -eq 0 ]; then
   if [ -z "$docs_changed" ]; then
     # Config, commands and dependencies — documented in the setup/scripts sections.
     trigger=$(printf '%s\n' "$staged" | grep -E \
-      '^(\.nvmrc|frontend/(package\.json|tsconfig\.json|vite\.config\.ts)|backend/(package\.json|\.env\.example)|githooks/.*)$' || true)
+      '^(\.nvmrc|staticwebapp\.config\.json|frontend/(package\.json|tsconfig\.json|vite\.config\.ts)|backend/(package\.json|\.env\.example)|githooks/.*|\.github/workflows/.*)$' || true)
     # The Azure request contract lives here; the docs quote its behaviour closely.
-    trigger="$trigger$(printf '%s\n' "$staged" | grep -E '^backend/src/' || true)"
+    trigger="$trigger$(printf '%s\n' "$staged" | grep -E '^(backend|api)/src/' || true)"
     # Added or deleted files change the project-layout listing in both docs.
     layout=$(git diff --cached --name-only --diff-filter=AD \
       | grep -E '^(backend|frontend)/.*\.(js|jsx|ts|tsx|css)$' || true)

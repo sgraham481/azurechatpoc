@@ -19,3 +19,6 @@ npm-debug.log*
 .DS_Store
 .vscode/
 .idea/
+
+# azure static web apps
+.swa/
