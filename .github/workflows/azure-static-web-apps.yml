@@ -18,31 +18,47 @@ jobs:
     name: Build and deploy
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: false
 
       - uses: actions/setup-node@v4
         with:
           # Matches .nvmrc so CI cannot drift from local.
           node-version-file: .nvmrc
 
-      # Run the same gate as githooks/pre-commit. A type error should fail the
-      # deploy, not ship — Vite alone would happily bundle broken types.
-      - name: Typecheck frontend
+      - name: Install frontend deps
         working-directory: frontend
+        run: npm ci
+
+      # Same gate as githooks/pre-commit. A type error should fail the deploy,
+      # not ship — Vite alone would happily bundle broken types.
+      - name: Typecheck
+        working-directory: frontend
+        run: npm run check
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      # Fail loudly here rather than uploading an empty artifact and getting a
+      # 404 site that reports a successful deploy.
+      - name: Verify build output
         run: |
-          npm ci
-          npm run check
+          test -f frontend/dist/index.html || { echo "::error::dist/index.html missing"; exit 1; }
+          test -f frontend/dist/staticwebapp.config.json || { echo "::error::staticwebapp.config.json missing from dist — auth would not apply"; exit 1; }
+          test -f frontend/dist/login.html || { echo "::error::login.html missing from dist"; exit 1; }
+          echo "dist/ contents:"; ls -R frontend/dist
 
       - name: Deploy
         uses: Azure/static-web-apps-deploy@v1
         with:
-          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_AMBITIOUS_FLOWER_0CD51B70F }}
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: upload
-          app_location: frontend
+          # Built above, so Oryx must not try to build it again. app_location
+          # therefore points at the finished artifact, not the source.
+          app_location: frontend/dist
+          skip_app_build: true
+          output_location: ''
           api_location: api
-          output_location: dist
 
   close_pull_request:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'
@@ -51,5 +67,5 @@ jobs:
     steps:
       - uses: Azure/static-web-apps-deploy@v1
         with:
-          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_AMBITIOUS_FLOWER_0CD51B70F }}
           action: close

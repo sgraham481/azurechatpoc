@@ -115,12 +115,14 @@ Steps 1–4 must be done by someone with access to the Azure subscription; they 
 1. **Create the Static Web App.** Azure portal → Create resource → Static Web App. Plan: **Free**.
    Deployment source: **GitHub**, this repo, branch `main`. When it asks for build details, choose
    *Custom* and enter app location `frontend`, api location `api`, output location `dist`.
-   Azure adds a deployment workflow of its own — **delete it**, since
-   `.github/workflows/azure-static-web-apps.yml` in this repo already does the job and additionally runs
-   `npm run check` before deploying.
-2. **Add the deployment token to GitHub.** Portal → your Static Web App → *Manage deployment token*, copy it.
-   GitHub → repo → Settings → Secrets and variables → Actions → new secret named
-   `AZURE_STATIC_WEB_APPS_API_TOKEN`.
+   Azure adds a deployment workflow of its own and a matching repository secret. **Delete the workflow it
+   adds** — ours already does the job, additionally runs `npm run check`, and verifies the built artifact
+   before uploading. **Keep the secret**; our workflow references it by the name Azure generated, so the
+   token never has to be copied by hand.
+2. **The deployment token is handled for you.** Creating the resource from the portal with GitHub as the
+   source adds the secret to the repo automatically. Only if you need to rotate it: portal → *Manage
+   deployment token* → update the existing repository secret in GitHub. Never paste the token into a file
+   or a chat.
 3. **Add the Azure credentials as application settings.** Portal → your Static Web App → *Environment
    variables* (Application settings). These are the same names as `backend/.env` and are what the Function
    reads at runtime:
@@ -137,7 +139,9 @@ Steps 1–4 must be done by someone with access to the Azure subscription; they 
 
 ### Access control
 
-`staticwebapp.config.json` gates `/*` and `POST /api/chat` behind a **custom role named `chatuser`**.
+`frontend/public/staticwebapp.config.json` gates `/*` and `POST /api/chat` behind a **custom role named
+`chatuser`**. It lives under `public/` so Vite copies it into `dist/` — Static Web Apps only reads it from
+the deployed artifact, and a copy at the repo root is silently ignored, which deploys an open site.
 
 This distinction matters: the built-in `authenticated` role would admit **anyone with a Microsoft or GitHub
 account** — the entire internet, spending your Azure tokens. `chatuser` is granted only by invitation.

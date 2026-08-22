@@ -5,6 +5,25 @@ Add entries under `[Unreleased]` in the same commit as the code change.
 
 ## [Unreleased]
 
+### Fixed
+
+- **`staticwebapp.config.json` moved into `frontend/public/` so it ships inside `dist/`.** At the repo root
+  it was outside `app_location`, so Static Web Apps never read it — meaning the role gating did not apply
+  and the first deploy would have been publicly accessible. Caught by probing the deployed site, not by
+  review. The deploy workflow now fails if the file is missing from the built output.
+- **The deploy builds in a step we control rather than delegating to Oryx.** The first deploy reported
+  success while every path returned 404, and the action's own logs gave no usable signal. The workflow now
+  runs `npm ci`, `npm run check`, and `npm run build` explicitly, asserts that `index.html`,
+  `login.html`, and `staticwebapp.config.json` exist in `dist/`, then uploads with `skip_app_build: true`.
+  A missing artifact now fails the job instead of publishing an empty site.
+
+### Changed
+
+- **Consolidated to one deploy workflow.** Azure added its own on resource creation, which raced with
+  ours and skipped the typecheck gate. Removed it and pointed our workflow at the secret Azure had already
+  created (`AZURE_STATIC_WEB_APPS_API_TOKEN_AMBITIOUS_FLOWER_0CD51B70F`), so the token never needs handling
+  by hand.
+
 ### Added
 
 - **Deployment to Azure Static Web Apps**, so the app can be shared in a browser with the Azure key still
