@@ -1,0 +1,100 @@
+# CLAUDE.md
+
+Context for an agent picking this repo up cold. Read this before changing the Azure call path — several
+non-obvious constraints below were found by probing the live resource, not by reading docs.
+
+## What this is
+
+A POC: a React chat UI styled as "Astrion Executive Command Center", streaming from Azure AI Foundry
+through a Node/Express proxy so the API key never reaches the browser.
+
+```
+React (Vite) :5173  --/api/chat (SSE)-->  Node/Express :3001  --HTTPS-->  Azure AI Foundry
+```
+
+**Stack: React 18 + Vite 5, plain JavaScript.** There is no TypeScript — no `.ts`/`.tsx`, no `tsconfig.json`,
+no `typescript` or `@types/*` dependency. `.jsx` is JSX-in-JS, not TS. Backend is ESM (`"type": "module"`),
+Express 4, and calls Azure with bare `fetch` — no `openai` or `@azure/*` SDK.
+
+## Running it
+
+Node **22.22.2**, pinned in `.nvmrc` and set as the nvm `default`, so a new terminal already has it.
+Node 18+ is the real floor (the backend needs global `fetch`). Verify with `node -v` before debugging
+anything weird — this machine has Node 10 installed and it produces a bare `SyntaxError: Unexpected token {`.
+
+```bash
+cd backend  && npm install && npm run dev   # :3001
+cd frontend && npm install && npm run dev   # :5173  <- open this one
+```
+
+Vite proxies `/api/*` to :3001, so there is no CORS in dev. `GET /api/health` returns `{ ok, configured }`.
+The backend boots fine without credentials and reports which vars are missing.
+
+`npm run preview` (production build on :4173) does **not** proxy `/api` — `vite.config.js` puts the proxy
+under `server`, which Vite does not reuse for `preview`. Chat 404s there until a `preview.proxy` block exists.
+
+## Azure: the constraints that actually matter
+
+The resource is **Azure AI Foundry** (`*.services.ai.azure.com`), **not** classic Azure OpenAI
+(`*.openai.azure.com`), and the deployed model is **gpt-5-mini**, a *reasoning* model. Both facts change
+the request shape. All of the following were confirmed against the live endpoint:
+
+| Constraint | Why |
+| --- | --- |
+| Use `max_completion_tokens`, never `max_tokens` | Azure 400: *"'max_tokens' is not supported with this model"* |
+| Do **not** send `temperature` | Azure 400: *"does not support 0.7 … Only the default (1) value is supported"* |
+| Budget needs real headroom (default 2000) | Reasoning tokens are billed against the same budget and are emitted *before* any visible text |
+| v1 URL: `{base}/openai/v1/chat/completions`, deployment goes in the body as `model` | Foundry's v1 surface; the classic `/openai/deployments/{dep}/...?api-version=` path also works, but v1 is version-less |
+| `AZURE_OPENAI_API_VERSION` is unused | The v1 surface takes no `api-version`. Kept in `.env.example` only for the classic path |
+| Plain `api-key` header is enough | The Foundry portal sample shows `DefaultAzureCredential`, but key auth was verified working on both surfaces. No Entra dependency |
+
+**The reasoning-budget trap.** gpt-5-mini can spend the *entire* completion budget on hidden reasoning and
+return HTTP 200 with `finish_reason: "length"` and empty content. Measured: budgets of 50 and 200 produced
+zero visible text; a routine question used 512 reasoning tokens. A blank assistant bubble is almost always
+this, not a streaming bug — raise `AZURE_OPENAI_MAX_TOKENS`. Both paths guard against it: the non-streaming
+path returns a `budget_exhausted` error, and `App.jsx` names the cause when a stream yields no deltas.
+
+## Configuration
+
+`backend/.env` (gitignored — never commit it, never print the key):
+
+| Variable | Notes |
+| --- | --- |
+| `AZURE_OPENAI_ENDPOINT` | Base host. A trailing `/openai/v1` is tolerated and stripped |
+| `AZURE_OPENAI_API_KEY` | Portal → Keys and Endpoint |
+| `AZURE_OPENAI_DEPLOYMENT` | Deployment name (`gpt-5-mini`), not the model family |
+| `AZURE_OPENAI_MAX_TOKENS` | Optional, defaults to 2000. Raise if answers truncate |
+| `PORT` / `CORS_ORIGIN` | Default `3001` / `http://localhost:5173` |
+
+## Layout
+
+```
+backend/src/server.js        Express app, CORS, /api/health, config validation
+backend/src/routes/chat.js   POST /api/chat — system prompt, Azure v1 call, SSE passthrough, error mapping
+frontend/src/App.jsx         Message state, send handler, hand-rolled SSE parsing
+frontend/src/components/     Header/Sidebar/Footer (presentational), ChatWindow, MessageBubble,
+                             ChatInput, SuggestionChips, Icons (inline SVG)
+frontend/src/styles.css      Design tokens and layout
+```
+
+Streaming is parsed by hand in `App.jsx`: SSE frames split on a blank line, buffered across chunk
+boundaries. Errors always render as an inline error bubble — never an alert, never a blank screen — and
+the rest of the conversation survives.
+
+## Conventions
+
+- **Release notes are required for every commit.** Add an entry to `CHANGELOG.md` under `[Unreleased]`
+  in the same commit as the code change. Keep a Changelog format; describe user-visible effect and the
+  evidence for non-obvious fixes.
+- Commits go to `main`; remote is `origin` (HTTPS, authenticated via macOS keychain).
+- Never commit `.env`, keys, or `node_modules`.
+
+## Known gaps (deliberate)
+
+- The ASTRION wordmark in `Icons.jsx` is a **placeholder** SVG.
+- Search, notifications, the avatar, and footer links are presentational only.
+- The footer "Data as of" timestamp is hardcoded in `App.jsx`.
+- **No real business data is wired in.** The system prompt forbids inventing figures, so the model will
+  decline specific numbers — including the "Why is Rule of 40 at 7.3%?" suggestion chip. Expected, not a bug.
+- No auth, no persistence (refresh clears the chat), single user, local only.
+- No tests and no lint config.

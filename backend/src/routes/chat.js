@@ -14,8 +14,13 @@ const REQUIRED_ENV = [
   'AZURE_OPENAI_ENDPOINT',
   'AZURE_OPENAI_API_KEY',
   'AZURE_OPENAI_DEPLOYMENT',
-  'AZURE_OPENAI_API_VERSION',
 ];
+
+// gpt-5 reasoning models spend part of this budget on hidden reasoning tokens
+// before emitting any visible text. Measured: a short factual answer burned ~192
+// reasoning tokens, and budgets of 50/200 returned finish_reason "length" with
+// empty content. Keep generous headroom so answers aren't silently truncated.
+const MAX_COMPLETION_TOKENS = Number(process.env.AZURE_OPENAI_MAX_TOKENS) || 2000;
 
 const VALID_ROLES = new Set(['system', 'user', 'assistant']);
 
@@ -53,10 +58,11 @@ router.post('/', async (req, res) => {
   // Streaming is the default; ?stream=false gives the simpler path if the demo misbehaves.
   const stream = req.query.stream !== 'false';
 
-  const url =
-    `${process.env.AZURE_OPENAI_ENDPOINT.replace(/\/$/, '')}` +
-    `/openai/deployments/${process.env.AZURE_OPENAI_DEPLOYMENT}` +
-    `/chat/completions?api-version=${process.env.AZURE_OPENAI_API_VERSION}`;
+  // Azure AI Foundry's v1 surface: version-less, deployment goes in the body as
+  // `model`. The portal shows the endpoint with /openai/v1 already appended, so
+  // tolerate that (and a bare host) rather than doubling the path.
+  const base = process.env.AZURE_OPENAI_ENDPOINT.replace(/\/+$/, '').replace(/\/openai(\/v1)?$/, '');
+  const url = `${base}/openai/v1/chat/completions`;
 
   // Abort the upstream call if the browser hangs up mid-stream.
   const controller = new AbortController();
@@ -71,10 +77,12 @@ router.post('/', async (req, res) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
+        model: process.env.AZURE_OPENAI_DEPLOYMENT,
         messages: payloadMessages,
         stream,
-        temperature: 0.7,
-        max_tokens: 800,
+        // No `temperature`: gpt-5 models accept only the default (1).
+        // `max_tokens` is rejected outright in favour of this field.
+        max_completion_tokens: MAX_COMPLETION_TOKENS,
       }),
       signal: controller.signal,
     });
@@ -97,6 +105,13 @@ router.post('/', async (req, res) => {
 
   if (!stream) {
     const data = await azureRes.json();
+    if (truncatedBeforeText(data)) {
+      return res.status(200).json({
+        error: 'budget_exhausted',
+        message:
+          'The model used its whole token budget on reasoning and returned no text. Raise AZURE_OPENAI_MAX_TOKENS.',
+      });
+    }
     const blocked = contentFilterFinish(data);
     if (blocked) {
       return res.status(200).json({
@@ -143,6 +158,15 @@ async function safeReadError(response) {
   }
 }
 
+// gpt-5 can burn the entire completion budget on hidden reasoning, returning a
+// 200 with finish_reason "length" and empty content. Without this it surfaces as
+// a blank assistant bubble, which reads like a bug rather than a config issue.
+function truncatedBeforeText(data) {
+  return data?.choices?.some(
+    (c) => c.finish_reason === 'length' && !(c.message?.content || '').trim()
+  );
+}
+
 function contentFilterFinish(data) {
   return data?.choices?.some((c) => c.finish_reason === 'content_filter');
 }
@@ -172,7 +196,7 @@ function mapAzureError(status, detail, headers) {
     return {
       status: 500,
       error: 'deployment_not_found',
-      message: `Azure could not find that deployment. Check AZURE_OPENAI_DEPLOYMENT (${process.env.AZURE_OPENAI_DEPLOYMENT}) and AZURE_OPENAI_API_VERSION.`,
+      message: `Azure could not find that deployment. Check AZURE_OPENAI_DEPLOYMENT (${process.env.AZURE_OPENAI_DEPLOYMENT}) and AZURE_OPENAI_ENDPOINT.`,
     };
   }
 

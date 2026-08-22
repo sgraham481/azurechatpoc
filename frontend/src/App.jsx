@@ -71,6 +71,7 @@ export default function App() {
       let buffer = '';
       let assistantText = '';
       let started = false;
+      let finishReason = null;
 
       // Azure sends SSE frames separated by a blank line; a frame can arrive
       // split across chunks, so buffer until we have complete frames.
@@ -98,9 +99,11 @@ export default function App() {
             if (parsed.error) throw new Error(parsed.message || 'The response stream failed.');
 
             const delta = parsed.choices?.[0]?.delta?.content;
-            if (parsed.choices?.[0]?.finish_reason === 'content_filter') {
+            const finish = parsed.choices?.[0]?.finish_reason;
+            if (finish === 'content_filter') {
               throw new Error("That response was blocked by Azure's content filter. Try rephrasing.");
             }
+            if (finish) finishReason = finish;
             if (!delta) continue;
 
             assistantText += delta;
@@ -122,7 +125,11 @@ export default function App() {
       }
 
       if (!started) {
-        throw new Error('Azure returned an empty response. Try again.');
+        throw new Error(
+          finishReason === 'length'
+            ? 'The model spent its whole token budget on reasoning before writing an answer. Raise AZURE_OPENAI_MAX_TOKENS in backend/.env.'
+            : 'Azure returned an empty response. Try again.'
+        );
       }
 
       setMessages((prev) => prev.map((m) => (m.id === assistantId ? { ...m, isStreaming: false } : m)));
