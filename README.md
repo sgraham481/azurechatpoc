@@ -10,14 +10,12 @@ The browser never talks to Azure directly. The API key lives only in `backend/.e
 
 ## Prerequisites
 
-- **Node.js 18+.** This repo pins **22.22.2** via `.nvmrc`. Your shell defaults to Node 10, so run `nvm use` in each terminal before the commands below.
+- **Node.js 18+.** This repo pins **22.22.2** via `.nvmrc`, and that is also the nvm `default`, so a new terminal already lands on it — check with `node -v`. If yours reports something older (a different version manager, or the default has drifted), run `nvm use` to pick up `.nvmrc`.
 - An Azure OpenAI resource with a deployed chat model (e.g. `gpt-4o-mini`).
 
 ## Setup
 
 ```bash
-nvm use                      # picks up .nvmrc (22.22.2)
-
 cd backend  && npm install
 cd ../frontend && npm install
 ```
@@ -40,7 +38,7 @@ cp .env.example .env
 
 ## Running
 
-Two terminals, `nvm use` in each:
+Two terminals:
 
 ```bash
 # terminal 1
@@ -53,6 +51,18 @@ cd frontend && npm run dev
 Open the URL Vite prints (`http://localhost:5173`). Vite proxies `/api/*` to the backend, so there's no CORS friction in dev.
 
 The backend starts fine without Azure credentials — it logs which variables are missing, and `/api/chat` returns a clear error until you set them. `GET /api/health` reports `{ ok, configured }`.
+
+### Production build
+
+`npm run dev` is the one to use while working on the UI — hot module reload, unminified, source maps. To check the optimized bundle instead:
+
+```bash
+cd frontend
+npm run build     # emits dist/ (~152 kB raw, ~49 kB gzipped)
+npm run preview   # serves dist/ on http://localhost:4173
+```
+
+**`preview` does not proxy `/api`.** The proxy in `vite.config.js` sits under `server`, which only applies to `npm run dev`; Vite does not reuse it for `preview`. So chat calls 404 on :4173 until you either add a matching `preview.proxy` block to `vite.config.js` or set `CORS_ORIGIN=http://localhost:4173` in `backend/.env` and point the frontend at the backend directly. The UI shell itself renders fine either way.
 
 ## How streaming works
 
