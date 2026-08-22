@@ -1,6 +1,9 @@
-import { SparkIcon } from './Icons.jsx';
+import { SparkIcon } from './Icons.tsx';
+import type { Message } from '../types.ts';
 
-export default function MessageBubble({ role, content, isError, isStreaming }) {
+type MessageBubbleProps = Pick<Message, 'role' | 'content' | 'isError' | 'isStreaming'>;
+
+export default function MessageBubble({ role, content, isError, isStreaming }: MessageBubbleProps) {
   const isUser = role === 'user';
 
   const bubbleClass = isError

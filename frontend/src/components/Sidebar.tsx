@@ -1,4 +1,4 @@
-import { SparkIcon } from './Icons.jsx';
+import { SparkIcon } from './Icons.tsx';
 
 export default function Sidebar() {
   return (

@@ -1,8 +1,14 @@
 import { useEffect, useRef } from 'react';
-import MessageBubble from './MessageBubble.jsx';
+import MessageBubble from './MessageBubble.tsx';
+import type { Message } from '../types.ts';
 
-export default function ChatWindow({ messages, isWaitingFirstToken }) {
-  const endRef = useRef(null);
+interface ChatWindowProps {
+  messages: readonly Message[];
+  isWaitingFirstToken: boolean;
+}
+
+export default function ChatWindow({ messages, isWaitingFirstToken }: ChatWindowProps) {
+  const endRef = useRef<HTMLDivElement>(null);
 
   // Follow the conversation as it grows, including during token streaming.
   useEffect(() => {

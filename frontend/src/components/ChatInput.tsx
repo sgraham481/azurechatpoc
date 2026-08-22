@@ -1,10 +1,18 @@
 import { useRef } from 'react';
-import { SendIcon } from './Icons.jsx';
+import type { ChangeEvent, KeyboardEvent } from 'react';
+import { SendIcon } from './Icons.tsx';
 
-export default function ChatInput({ value, onChange, onSend, disabled }) {
-  const textareaRef = useRef(null);
+interface ChatInputProps {
+  value: string;
+  onChange: (value: string) => void;
+  onSend: () => void;
+  disabled: boolean;
+}
 
-  function handleKeyDown(e) {
+export default function ChatInput({ value, onChange, onSend, disabled }: ChatInputProps) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  function handleKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
     // Enter sends, Shift+Enter makes a newline.
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -12,7 +20,7 @@ export default function ChatInput({ value, onChange, onSend, disabled }) {
     }
   }
 
-  function handleChange(e) {
+  function handleChange(e: ChangeEvent<HTMLTextAreaElement>) {
     onChange(e.target.value);
     const el = textareaRef.current;
     if (el) {

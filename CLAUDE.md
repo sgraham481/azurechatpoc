@@ -12,9 +12,20 @@ through a Node/Express proxy so the API key never reaches the browser.
 React (Vite) :5173  --/api/chat (SSE)-->  Node/Express :3001  --HTTPS-->  Azure AI Foundry
 ```
 
-**Stack: React 18 + Vite 5, plain JavaScript.** There is no TypeScript — no `.ts`/`.tsx`, no `tsconfig.json`,
-no `typescript` or `@types/*` dependency. `.jsx` is JSX-in-JS, not TS. Backend is ESM (`"type": "module"`),
-Express 4, and calls Azure with bare `fetch` — no `openai` or `@azure/*` SDK.
+**Frontend: React 18 + Vite 5 in strict TypeScript. Backend: Express 4 in plain JavaScript.** The split is
+intentional — only the frontend was converted (2026-08-22). Backend is ESM (`"type": "module"`) and calls
+Azure with bare `fetch`; there is no `openai` or `@azure/*` SDK, so the request body is built by hand.
+
+**Vite does not typecheck.** It strips types at transform time, so `npm run dev` happily hot-reloads code
+that does not compile. `tsc` is the only gate: `npm run typecheck` (or `npm run build`, which runs it first).
+Run it before committing frontend changes.
+
+`frontend/tsconfig.json` is strict and additionally sets `noUnusedLocals`, `noUnusedParameters`,
+`noFallthroughCasesInSwitch`, and `noUncheckedIndexedAccess`. The last one means array indexing yields
+`T | undefined`, which is why `App.tsx` guards `frames.pop()` and `parsed.choices?.[0]`.
+
+Shared types are in `frontend/src/types.ts`. `StreamChunk.choices` is optional on purpose: Azure's first SSE
+frame contains only prompt content-filter results with an empty `choices` array.
 
 ## Running it
 
@@ -71,10 +82,12 @@ path returns a `budget_exhausted` error, and `App.jsx` names the cause when a st
 ```
 backend/src/server.js        Express app, CORS, /api/health, config validation
 backend/src/routes/chat.js   POST /api/chat — system prompt, Azure v1 call, SSE passthrough, error mapping
-frontend/src/App.jsx         Message state, send handler, hand-rolled SSE parsing
+frontend/src/types.ts        Message, WireMessage, StreamChunk, FinishReason, ApiError
+frontend/src/App.tsx         Message state, send handler, hand-rolled SSE parsing
 frontend/src/components/     Header/Sidebar/Footer (presentational), ChatWindow, MessageBubble,
-                             ChatInput, SuggestionChips, Icons (inline SVG)
+                             ChatInput, SuggestionChips, Icons (inline SVG) — all .tsx
 frontend/src/styles.css      Design tokens and layout
+frontend/tsconfig.json       Strict; noEmit (Vite owns emit)
 ```
 
 Streaming is parsed by hand in `App.jsx`: SSE frames split on a blank line, buffered across chunk
@@ -98,3 +111,4 @@ the rest of the conversation survives.
   decline specific numbers — including the "Why is Rule of 40 at 7.3%?" suggestion chip. Expected, not a bug.
 - No auth, no persistence (refresh clears the chat), single user, local only.
 - No tests and no lint config.
+- **The backend is still plain JavaScript.** Converting it is a reasonable next step but has not been done.

@@ -128,24 +128,45 @@ backend/
   src/routes/chat.js     POST /api/chat — system prompt, Azure v1 call, SSE passthrough, error mapping
   .env.example
 frontend/
-  src/App.jsx            Message state, send handler, SSE parsing
+  tsconfig.json          Strict TS config; type checking only, Vite owns emit
+  src/types.ts           Message, WireMessage, StreamChunk, FinishReason, ApiError
+  src/App.tsx            Message state, send handler, SSE parsing
   src/components/
-    Header.jsx           Top bar (presentational)
-    Sidebar.jsx          Left nav (presentational)
-    Footer.jsx           Footer bar (presentational)
-    ChatWindow.jsx       Scrollable message list, auto-scroll, typing indicator
-    MessageBubble.jsx    User / assistant / error bubble styling
-    ChatInput.jsx        Auto-growing textarea, Enter to send, Shift+Enter for newline
-    SuggestionChips.jsx  Starter prompts — clicking one sends it
-    Icons.jsx            Inline SVGs, no icon dependency
+    Header.tsx           Top bar (presentational)
+    Sidebar.tsx          Left nav (presentational)
+    Footer.tsx           Footer bar (presentational)
+    ChatWindow.tsx       Scrollable message list, auto-scroll, typing indicator
+    MessageBubble.tsx    User / assistant / error bubble styling
+    ChatInput.tsx        Auto-growing textarea, Enter to send, Shift+Enter for newline
+    SuggestionChips.tsx  Starter prompts — clicking one sends it
+    Icons.tsx            Inline SVGs, no icon dependency
   src/styles.css         Design tokens and layout
 ```
 
 ## Stack
 
-**React 18 + Vite 5 on the frontend, Node/Express 4 on the backend — plain JavaScript throughout.**
-There is no TypeScript: no `.ts`/`.tsx`, no `tsconfig.json`, and no `typescript` or `@types/*` dependency.
-The `.jsx` extension is JSX-in-JavaScript, which Vite compiles; it is unrelated to TypeScript.
+**Frontend: React 18 + Vite 5 in TypeScript** (strict). **Backend: Node/Express 4 in plain JavaScript.**
+The two halves differ deliberately — only the frontend has been converted so far.
+
+Type checking is a separate step from bundling: Vite strips types without checking them, so `tsc` is the
+only thing that will actually fail on a type error.
+
+```bash
+cd frontend
+npm run typecheck    # tsc --noEmit
+npm run build        # runs tsc --noEmit first, then vite build
+```
+
+`npm run dev` does **not** typecheck — Vite's transform ignores types entirely, so a broken type still hot-reloads
+happily. Run `typecheck` before committing.
+
+`tsconfig.json` enables `strict` plus `noUnusedLocals`, `noUnusedParameters`, `noFallthroughCasesInSwitch`,
+and `noUncheckedIndexedAccess`. That last one is why `buffer.split()` results are accessed defensively in
+`App.tsx` — indexing an array yields `T | undefined`.
+
+Shared types live in `frontend/src/types.ts`: `Message` (UI state), `WireMessage` (the trimmed shape sent to
+the backend), `StreamChunk` (one Azure SSE frame), and `FinishReason`. Note `StreamChunk.choices` is
+optional because Azure's first frame carries only prompt filter results with an empty `choices` array.
 
 The backend is ESM (`"type": "module"`) and calls Azure with the built-in `fetch` — there is no `openai`
 or `@azure/*` SDK, which is why the request body is assembled by hand in `chat.js`. There are no tests and

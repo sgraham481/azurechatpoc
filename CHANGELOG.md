@@ -5,6 +5,25 @@ Add entries under `[Unreleased]` in the same commit as the code change.
 
 ## [Unreleased]
 
+### Changed
+
+- **The frontend is now TypeScript.** All 10 `.jsx` files became `.tsx` (renamed via `git mv`, so history
+  follows), `vite.config.js` became `vite.config.ts`, and `index.html` now loads `/src/main.tsx`. Added
+  `typescript`, `@types/react`, and `@types/react-dom` as dev dependencies. The backend is unchanged and
+  remains plain JavaScript.
+  - `tsconfig.json` is `strict`, plus `noUnusedLocals`, `noUnusedParameters`, `noFallthroughCasesInSwitch`,
+    and `noUncheckedIndexedAccess`. It sets `noEmit` — Vite still does the bundling; `tsc` only checks.
+  - **`npm run build` now runs `tsc --noEmit` first**, so a type error fails the build. Added
+    `npm run typecheck` for the check alone. Note `npm run dev` does *not* typecheck: Vite strips types
+    without checking them, so broken types still hot-reload.
+  - New `src/types.ts` holds the shared model: `Message` (UI state, including the UI-only `isError` and
+    `isStreaming` flags), `WireMessage` (the trimmed `{role, content}` shape actually sent to the backend),
+    `StreamChunk` (one Azure SSE frame), `FinishReason`, and `ApiError`.
+  - `StreamChunk.choices` is typed optional because Azure's first SSE frame carries only prompt
+    content-filter results with an empty `choices` array — the types now document that quirk.
+  - `main.tsx` throws a clear error if `#root` is missing rather than passing `null` to `createRoot`, and
+    `App.tsx` narrows caught errors with `instanceof` instead of assuming `err.message` exists.
+
 ### Fixed
 
 - **Azure calls now target AI Foundry's v1 surface.** The request URL is
@@ -40,6 +59,10 @@ Add entries under `[Unreleased]` in the same commit as the code change.
   `/api` proxy from `vite.config.js`'s `server` block.
 
 ### Documentation
+
+- **README and `CLAUDE.md` corrected on the stack**, which previously stated outright that the project had
+  no TypeScript. Both now describe the strict config, the `types.ts` model, and — most importantly — that
+  `npm run dev` does not typecheck, so `tsc` is the only real gate.
 
 - **All docs updated to describe Azure AI Foundry rather than classic Azure OpenAI**, matching the code as
   shipped: the title, architecture diagram, prerequisites, and project layout now name the v1 surface.

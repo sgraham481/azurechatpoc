@@ -1,6 +1,11 @@
 // Inline SVGs so the POC has no icon-library dependency.
 
-export function SparkIcon({ size = 22, color = '#fff' }) {
+interface SparkIconProps {
+  size?: number;
+  color?: string;
+}
+
+export function SparkIcon({ size = 22, color = '#fff' }: SparkIconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path d="M13 2.5l1.6 4.6 4.6 1.6-4.6 1.6L13 15l-1.6-4.7L6.8 8.7l4.6-1.6L13 2.5z" fill={color} />
@@ -82,7 +87,11 @@ export function HelpIcon() {
 }
 
 // Placeholder wordmark — swap for the real Astrion SVG when you have the asset.
-export function Wordmark({ color = '#fff' }) {
+interface WordmarkProps {
+  color?: string;
+}
+
+export function Wordmark({ color = '#fff' }: WordmarkProps) {
   return (
     <span className="wordmark" style={{ color }}>
       <svg className="wordmark__mark" width="34" height="20" viewBox="0 0 34 20" fill="none" aria-hidden="true">

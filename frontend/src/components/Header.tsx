@@ -1,4 +1,4 @@
-import { PanelIcon, SearchIcon, BellIcon, Wordmark } from './Icons.jsx';
+import { PanelIcon, SearchIcon, BellIcon, Wordmark } from './Icons.tsx';
 
 // Presentational only — search, notifications and the account menu are out of
 // scope for the POC (spec §9), but the shell should look like the real product.

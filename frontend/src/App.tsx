@@ -1,11 +1,12 @@
 import { useRef, useState } from 'react';
-import Header from './components/Header.jsx';
-import Sidebar from './components/Sidebar.jsx';
-import Footer from './components/Footer.jsx';
-import ChatWindow from './components/ChatWindow.jsx';
-import ChatInput from './components/ChatInput.jsx';
-import SuggestionChips from './components/SuggestionChips.jsx';
-import { SparkIcon } from './components/Icons.jsx';
+import Header from './components/Header.tsx';
+import Sidebar from './components/Sidebar.tsx';
+import Footer from './components/Footer.tsx';
+import ChatWindow from './components/ChatWindow.tsx';
+import ChatInput from './components/ChatInput.tsx';
+import SuggestionChips from './components/SuggestionChips.tsx';
+import { SparkIcon } from './components/Icons.tsx';
+import type { ApiError, FinishReason, Message, StreamChunk, WireMessage } from './types.ts';
 
 const SUGGESTIONS = [
   'Where do we stand?',
@@ -13,34 +14,34 @@ const SUGGESTIONS = [
   'Top risks this week',
   'What moved in the brief?',
   'Broader markets this week',
-];
+] as const;
 
-const GREETING = {
+const GREETING: Message = {
   id: 'greeting',
   role: 'assistant',
   content: "I've read this week's brief and the live metrics. Ask me where the business stands, or pick a thread below.",
 };
 
 let idCounter = 0;
-const nextId = () => `m${++idCounter}`;
+const nextId = (): string => `m${++idCounter}`;
 
 export default function App() {
-  const [messages, setMessages] = useState([GREETING]);
+  const [messages, setMessages] = useState<Message[]>([GREETING]);
   const [input, setInput] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
   const [waitingFirstToken, setWaitingFirstToken] = useState(false);
-  const [lastResponseMs, setLastResponseMs] = useState(null);
-  const abortRef = useRef(null);
+  const [lastResponseMs, setLastResponseMs] = useState<number | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
-  async function sendMessage(text) {
+  async function sendMessage(text: string): Promise<void> {
     const trimmed = text.trim();
     if (!trimmed || isStreaming) return;
 
-    const userMessage = { id: nextId(), role: 'user', content: trimmed };
+    const userMessage: Message = { id: nextId(), role: 'user', content: trimmed };
     const assistantId = nextId();
 
     // Snapshot the history we send, so we don't depend on async state updates.
-    const history = [...messages, userMessage]
+    const history: WireMessage[] = [...messages, userMessage]
       .filter((m) => !m.isError && m.id !== 'greeting')
       .map(({ role, content }) => ({ role, content }));
 
@@ -62,16 +63,17 @@ export default function App() {
       });
 
       if (!res.ok) {
-        const problem = await res.json().catch(() => ({}));
+        const problem: ApiError = await res.json().catch(() => ({}) as ApiError);
         throw new Error(problem.message || `Request failed with status ${res.status}.`);
       }
+      if (!res.body) throw new Error('Response had no body to stream.');
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
       let assistantText = '';
       let started = false;
-      let finishReason = null;
+      let finishReason: FinishReason | null = null;
 
       // Azure sends SSE frames separated by a blank line; a frame can arrive
       // split across chunks, so buffer until we have complete frames.
@@ -81,6 +83,8 @@ export default function App() {
 
         buffer += decoder.decode(value, { stream: true });
         const frames = buffer.split('\n\n');
+        // `noUncheckedIndexedAccess` makes pop() possibly-undefined; the ?? keeps
+        // the trailing partial frame handling explicit.
         buffer = frames.pop() ?? '';
 
         for (const frame of frames) {
@@ -89,17 +93,19 @@ export default function App() {
             const payload = line.slice(5).trim();
             if (!payload || payload === '[DONE]') continue;
 
-            let parsed;
+            let parsed: StreamChunk;
             try {
-              parsed = JSON.parse(payload);
+              parsed = JSON.parse(payload) as StreamChunk;
             } catch {
               continue; // ignore keepalives / partial noise
             }
 
             if (parsed.error) throw new Error(parsed.message || 'The response stream failed.');
 
-            const delta = parsed.choices?.[0]?.delta?.content;
-            const finish = parsed.choices?.[0]?.finish_reason;
+            // The first frame carries only prompt filter results, so choices is empty.
+            const choice = parsed.choices?.[0];
+            const delta = choice?.delta?.content;
+            const finish = choice?.finish_reason;
             if (finish === 'content_filter') {
               throw new Error("That response was blocked by Azure's content filter. Try rephrasing.");
             }
@@ -135,11 +141,12 @@ export default function App() {
       setMessages((prev) => prev.map((m) => (m.id === assistantId ? { ...m, isStreaming: false } : m)));
       setLastResponseMs(Math.round(performance.now() - startedAt));
     } catch (err) {
-      if (err.name === 'AbortError') return;
+      if (err instanceof DOMException && err.name === 'AbortError') return;
+      const detail = err instanceof Error ? err.message : 'Something went wrong.';
       // Keep the conversation intact and show the failure inline (spec §6.4).
       setMessages((prev) => [
         ...prev.map((m) => (m.id === assistantId ? { ...m, isStreaming: false } : m)),
-        { id: nextId(), role: 'assistant', content: err.message, isError: true },
+        { id: nextId(), role: 'assistant', content: detail, isError: true },
       ]);
     } finally {
       setIsStreaming(false);
@@ -148,7 +155,7 @@ export default function App() {
     }
   }
 
-  function clearChat() {
+  function clearChat(): void {
     abortRef.current?.abort();
     setMessages([GREETING]);
     setInput('');

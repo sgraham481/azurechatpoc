@@ -1,6 +1,10 @@
-import { Wordmark, RefreshIcon, ChatIcon, HelpIcon } from './Icons.jsx';
+import { Wordmark, RefreshIcon, ChatIcon, HelpIcon } from './Icons.tsx';
 
-export default function Footer({ dataAsOf }) {
+interface FooterProps {
+  dataAsOf: string;
+}
+
+export default function Footer({ dataAsOf }: FooterProps) {
   return (
     <footer className="footer">
       <Wordmark color="#1b2a5e" />
