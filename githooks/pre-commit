@@ -50,12 +50,29 @@ if [ -n "$fe_changed" ]; then
   fi
 fi
 
-# --- Reminders the hook cannot verify ---------------------------------------
-if [ "$fail" -eq 0 ] && [ -n "$src_changed" ]; then
+# --- 3. Doc reminder, only for changes that plausibly invalidate docs --------
+# Deliberately NOT fired for every source edit. A reminder that is usually wrong
+# gets ignored, including on the commit where it mattered. So it triggers only on
+# changes that touch what the docs actually describe: setup, config, commands,
+# the Azure contract, and the file layout.
+if [ "$fail" -eq 0 ]; then
   docs_changed=$(printf '%s\n' "$staged" | grep -E '^(README|CLAUDE)\.md$' || true)
   if [ -z "$docs_changed" ]; then
-    say "Reminder: README.md and CLAUDE.md are unchanged."
-    printf '  Fine if this commit did not alter behaviour, setup, or the stack — but check.\n'
+    # Config, commands and dependencies — documented in the setup/scripts sections.
+    trigger=$(printf '%s\n' "$staged" | grep -E \
+      '^(\.nvmrc|frontend/(package\.json|tsconfig\.json|vite\.config\.ts)|backend/(package\.json|\.env\.example)|githooks/.*)$' || true)
+    # The Azure request contract lives here; the docs quote its behaviour closely.
+    trigger="$trigger$(printf '%s\n' "$staged" | grep -E '^backend/src/' || true)"
+    # Added or deleted files change the project-layout listing in both docs.
+    layout=$(git diff --cached --name-only --diff-filter=AD \
+      | grep -E '^(backend|frontend)/.*\.(js|jsx|ts|tsx|css)$' || true)
+    trigger="$trigger$layout"
+
+    if [ -n "$(printf '%s' "$trigger" | tr -d '[:space:]')" ]; then
+      say "Reminder: this touches something the docs describe, but README.md and CLAUDE.md are unchanged."
+      printf '%s\n' "$trigger" | grep -v '^$' | sed 's/^/    /' | sort -u
+      printf '\n  Update them if setup, commands, config, the Azure contract, or the layout changed.\n'
+    fi
   fi
 fi
 

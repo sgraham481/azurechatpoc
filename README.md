@@ -180,13 +180,22 @@ a follow-up. Before committing:
 | # | Step | Enforced? |
 | --- | --- | --- |
 | 1 | Add a `CHANGELOG.md` entry under `[Unreleased]`. For non-obvious fixes record the *evidence* — the verbatim API error, the measured numbers — since that is what a diff cannot convey | **blocks the commit** |
-| 2 | Update `README.md` if setup, commands, configuration, or the stack changed | reminder |
-| 3 | Update `CLAUDE.md` if the stack, Azure contract, run instructions, or conventions changed | reminder |
+| 2 | Update `README.md` if setup, commands, configuration, or the stack changed | targeted reminder |
+| 3 | Update `CLAUDE.md` if the stack, Azure contract, run instructions, or conventions changed | targeted reminder |
 | 4 | `cd frontend && npm run check` | **blocks the commit** |
 | 5 | Never commit `backend/.env`, keys, `node_modules`, or build output | `.gitignore` |
 
-Steps 1 and 4 are enforced by `githooks/pre-commit`. Steps 2 and 3 only warn — no hook can judge whether
-prose is still true, so that judgement stays with you.
+Steps 1 and 4 are enforced by `githooks/pre-commit`. Steps 2 and 3 only warn, and deliberately not on
+every commit — the reminder fires only for changes that plausibly invalidate a doc:
+
+- `package.json` (scripts or dependencies), `.env.example`, `tsconfig.json`, `vite.config.ts`, `.nvmrc`
+- anything under `backend/src/` — the docs quote the Azure request contract closely
+- any source file **added or deleted**, since that changes the project-layout listing
+
+Edits inside existing components stay silent. This is a deliberate trade: a reminder that fires on routine
+work gets ignored, and would then be missed on the commit that actually needed it. The cost is that a
+behaviour change confined to one component will not prompt you — steps 2 and 3 still rely on your
+judgement, which is why they are on the checklist rather than in the hook.
 
 **After a fresh clone, enable the hook** (Git does not do this automatically):
 

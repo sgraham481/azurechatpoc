@@ -16,6 +16,13 @@ Add entries under `[Unreleased]` in the same commit as the code change.
     `SyntaxError: Unexpected token ?`. Found while testing the hook, not in production.
   - Versioned in the repo rather than left in `.git/hooks`, so it survives a clone. Enable with
     `git config core.hooksPath githooks`. Bypass one commit with `git commit --no-verify`.
+  - **The doc reminder is targeted rather than firing on every source commit.** It triggers only for
+    changes that plausibly invalidate a doc: `package.json`, `.env.example`, `tsconfig.json`,
+    `vite.config.ts`, `.nvmrc`, anything under `backend/src/`, and any source file added or deleted.
+    Edits inside existing components are silent. A reminder that fires on routine work stops being read
+    and would then be ignored on the commit where it mattered; the accepted cost is that a behaviour
+    change confined to one component will not prompt you. Verified against five cases — silent for a CSS
+    tweak and a component edit, firing for a new env var, a `backend/src/` change, and an added file.
 - **`npm run check`** in `frontend/` — the umbrella verification entry point, currently `tsc --noEmit`.
   Lint and tests should be added behind this name rather than as new scripts. `npm run typecheck` remains
   for types specifically, and **`npm run build` now runs `check` first**, so a type error fails the build.

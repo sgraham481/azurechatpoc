@@ -109,8 +109,12 @@ before. Work through this checklist before committing:
 4. **`npm run check`** in `frontend/` — must pass. Vite does not typecheck, so this is the only gate.
 5. **Never commit** `backend/.env`, keys, `node_modules`, or build output.
 
-Steps 1 and 4 are enforced by `githooks/pre-commit`; steps 2 and 3 get a reminder, since no hook can
-judge whether a doc is still accurate. The hook is versioned in the repo — after a fresh clone, enable it:
+Steps 1 and 4 are enforced by `githooks/pre-commit`. Steps 2 and 3 only get a reminder, and only for
+changes that plausibly invalidate a doc: `package.json`, `.env.example`, `tsconfig.json`, `vite.config.ts`,
+`.nvmrc`, anything under `backend/src/`, and any source file added or deleted. Ordinary edits inside
+existing components are silent by design — a reminder that fires on every commit stops being read, and
+would then be ignored on the commit where it mattered. The hook is versioned in the repo — after a fresh
+clone, enable it:
 
 ```bash
 git config core.hooksPath githooks
