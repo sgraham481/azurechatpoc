@@ -79,6 +79,11 @@ npm run preview   # serves dist/ on http://localhost:4173
 
 ## Deploying (Azure Static Web Apps)
 
+**Live:** https://ambitious-flower-0cd51b70f.7.azurestaticapps.net/ — access is invitation-only, see
+[Access control](#access-control). Note the hostname's `.7.` region segment: it is not derivable from the
+resource name, so take it from the portal Overview rather than guessing.
+
+
 The app deploys to Azure Static Web Apps: the built React bundle is served statically, and
 `api/` runs as a managed Azure Function at `/api/*` on the same origin. The Azure key stays server-side,
 exactly as it does locally — **it is never in the bundle**.
@@ -300,7 +305,7 @@ npm run dev        # NO typechecking
 
 - The **ASTRION wordmark is a placeholder** SVG in `Icons.jsx`. Swap in the real asset when you have it.
 - Search, notifications, the account avatar, and the footer links are **presentational only** — deliberately out of scope.
-- The footer's "Data as of" timestamp is **hardcoded** in `App.jsx`; there's no live data source behind it.
+- The footer's "Data as of" timestamp is **hardcoded** in `App.tsx`; there's no live data source behind it.
 - The system prompt tells the model not to invent figures it wasn't given. Since no real metrics are wired in, it will decline specific numbers — worth knowing before you demo the "Why is Rule of 40 at 7.3%?" chip.
 - No auth, no persistence (refresh clears the chat), single user, local only.
 - No tests, no linter, no CI.

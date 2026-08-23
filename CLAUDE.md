@@ -63,7 +63,7 @@ the request shape. All of the following were confirmed against the live endpoint
 return HTTP 200 with `finish_reason: "length"` and empty content. Measured: budgets of 50 and 200 produced
 zero visible text; a routine question used 512 reasoning tokens. A blank assistant bubble is almost always
 this, not a streaming bug — raise `AZURE_OPENAI_MAX_TOKENS`. Both paths guard against it: the non-streaming
-path returns a `budget_exhausted` error, and `App.jsx` names the cause when a stream yields no deltas.
+path returns a `budget_exhausted` error, and `App.tsx` names the cause when a stream yields no deltas.
 
 ## Deployment
 
@@ -78,7 +78,11 @@ enabled on the repo and renders `README.md` via Jekyll; that is unrelated to the
   unreliable, so it returns one JSON completion. `App.tsx` picks its path from the response `Content-Type`,
   so the same build works locally (SSE) and deployed (JSON) with no configuration. Do not "fix" the
   deployed app by forcing the streaming path.
-- `staticwebapp.config.json` gates `/*` and `POST /api/chat` behind the custom role **`chatuser`**, granted
+- **`staticwebapp.config.json` must live in `frontend/public/`**, so Vite copies it into `dist/`. Static
+  Web Apps reads it only from the deployed artifact; a copy at the repo root is **silently ignored** and
+  the site deploys with no access control at all. This already happened once. The deploy workflow now
+  fails if the file is missing from `dist/`.
+- `frontend/public/staticwebapp.config.json` gates `/*` and `POST /api/chat` behind the custom role **`chatuser`**, granted
   only by invitation via the portal's Role management. This is deliberate: the built-in `authenticated`
   role would admit any Microsoft or GitHub account, i.e. anyone, spending real tokens. `/api/health` is
   intentionally anonymous so deploys can be smoke-tested.
@@ -86,6 +90,36 @@ enabled on the repo and renders `README.md` via Jekyll; that is unrelated to the
   `backend/.env`.
 - `.github/workflows/azure-static-web-apps.yml` runs `npm run check` before deploying, so a type error
   fails the deploy rather than shipping.
+
+## Current status (2026-08-23)
+
+**Deployed and live:** https://ambitious-flower-0cd51b70f.7.azurestaticapps.net/
+
+Verified against the running site:
+
+| Check | Result |
+| --- | --- |
+| Anonymous `GET /` | 302 → `/login.html` — app shell not served |
+| `GET /api/health` | 200 `{"ok":true,"configured":true}` |
+| Anonymous `POST /api/chat` | 302, zero bytes — no completion returned |
+| API key in delivered assets | 0 matches |
+| `globalHeaders` | all three applied |
+
+Azure resource name is `ambitious-flower-0cd51b70f`; note the hostname carries a **`.7.`** region segment
+(`...-0cd51b70f.7.azurestaticapps.net`), which is not guessable from the resource name — get it from the
+portal Overview if it is ever lost.
+
+Application settings are set in the portal: `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_KEY`,
+`AZURE_OPENAI_DEPLOYMENT`, `AZURE_OPENAI_MAX_TOKENS`. The deployment token is in the repo as
+`AZURE_STATIC_WEB_APPS_API_TOKEN_AMBITIOUS_FLOWER_0CD51B70F`, created by Azure — the workflow references
+that name, so it never needs handling by hand.
+
+**Outstanding:** nobody holds the `chatuser` role yet, so the live site admits no one. Grant it via portal →
+Role management → Invite before sharing. That is the only step between here and a shareable demo.
+
+**Not done / possible next steps:** the backend is still plain JavaScript (only the frontend was converted
+to TypeScript); there are no tests, no linter; the ASTRION wordmark is still a placeholder; no real business
+data is wired in.
 
 ## Configuration
 
@@ -107,7 +141,9 @@ backend/src/routes/chat.js   Local Express adapter over chat-core — adds the S
 api/src/chat-core.mjs        THE Azure contract — shared by the Function and the Express route
 api/src/functions/chat.mjs   Deployed POST /api/chat (JSON, no streaming)
 api/src/functions/health.mjs Deployed GET /api/health
-staticwebapp.config.json     Routes, roles, auth redirects for Static Web Apps
+frontend/public/
+  staticwebapp.config.json   Routes, roles, auth redirects. MUST live here, not at the repo
+                             root — see the Deployment section
 frontend/public/login.html   Sign-in chooser (Microsoft / GitHub)
 frontend/public/denied.html  Signed in but not invited
 frontend/src/types.ts        Message, WireMessage, StreamChunk, ChatCompletion, FinishReason, ApiError
@@ -118,7 +154,7 @@ frontend/src/styles.css      Design tokens and layout
 frontend/tsconfig.json       Strict; noEmit (Vite owns emit)
 ```
 
-Streaming is parsed by hand in `App.jsx`: SSE frames split on a blank line, buffered across chunk
+Streaming is parsed by hand in `App.tsx`: SSE frames split on a blank line, buffered across chunk
 boundaries. Errors always render as an inline error bubble — never an alert, never a blank screen — and
 the rest of the conversation survives.
 
@@ -169,7 +205,7 @@ npm run dev        # NO typechecking — Vite strips types without checking them
 
 - The ASTRION wordmark in `Icons.jsx` is a **placeholder** SVG.
 - Search, notifications, the avatar, and footer links are presentational only.
-- The footer "Data as of" timestamp is hardcoded in `App.jsx`.
+- The footer "Data as of" timestamp is hardcoded in `App.tsx`.
 - **No real business data is wired in.** The system prompt forbids inventing figures, so the model will
   decline specific numbers — including the "Why is Rule of 40 at 7.3%?" suggestion chip. Expected, not a bug.
 - No auth, no persistence (refresh clears the chat), single user, local only.

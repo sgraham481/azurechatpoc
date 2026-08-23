@@ -5,6 +5,20 @@ Add entries under `[Unreleased]` in the same commit as the code change.
 
 ## [Unreleased]
 
+### Documentation
+
+- **Recorded the deployment's live state** in `CLAUDE.md` (new "Current status" section) and the README:
+  the URL, the verification results against the running site, where the app settings and deployment token
+  live, and the one outstanding step — nobody holds the `chatuser` role yet, so the live site currently
+  admits no one.
+- Noted that the hostname carries a **`.7.`** region segment that is not derivable from the resource name.
+  Six wrong guesses were made from the resource name alone before the portal URL settled it.
+- **Corrected three stale references** found by auditing docs against the tree: `staticwebapp.config.json`
+  was still listed at the repo root in `CLAUDE.md`'s layout (it moved to `frontend/public/`, and the wrong
+  location silently disables all access control), and `App.jsx` survived the TypeScript conversion in three
+  places across both docs.
+
+
 ### Fixed
 
 - **`staticwebapp.config.json` moved into `frontend/public/` so it ships inside `dist/`.** At the repo root
