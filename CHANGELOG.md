@@ -7,6 +7,10 @@ Add entries under `[Unreleased]` in the same commit as the code change.
 
 ### Documentation
 
+- **Deployment confirmed working end to end.** Two accounts hold the `chatuser` role and have used the
+  live chat (confirmed by the repo owner). `CLAUDE.md`'s status section no longer lists role assignment as
+  outstanding, and now carries the invite procedure for adding users instead.
+
 - **Recorded the deployment's live state** in `CLAUDE.md` (new "Current status" section) and the README:
   the URL, the verification results against the running site, where the app settings and deployment token
   live, and the one outstanding step — nobody holds the `chatuser` role yet, so the live site currently

@@ -114,8 +114,16 @@ Application settings are set in the portal: `AZURE_OPENAI_ENDPOINT`, `AZURE_OPEN
 `AZURE_STATIC_WEB_APPS_API_TOKEN_AMBITIOUS_FLOWER_0CD51B70F`, created by Azure — the workflow references
 that name, so it never needs handling by hand.
 
-**Outstanding:** nobody holds the `chatuser` role yet, so the live site admits no one. Grant it via portal →
-Role management → Invite before sharing. That is the only step between here and a shareable demo.
+**The deployment is complete and working.** Two accounts hold the `chatuser` role and have signed in and
+used the chat end to end (confirmed by the repo owner, 2026-08-23). The anonymous boundary in the table
+above was verified separately by probing the live site.
+
+To add another user: portal → Role management → Invite → choose provider, enter their username or email,
+set the role to exactly `chatuser`, and send them the generated link. Signing in alone grants nothing; an
+uninvited account lands on `denied.html`.
+
+Reminder when demoing: the deployed Function returns one JSON completion rather than streaming, so the
+answer appears all at once after the typing indicator. That is by design — see the Deployment section.
 
 **Not done / possible next steps:** the backend is still plain JavaScript (only the frontend was converted
 to TypeScript); there are no tests, no linter; the ASTRION wordmark is still a placeholder; no real business
